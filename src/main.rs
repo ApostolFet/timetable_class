@@ -1,13 +1,17 @@
 use std::collections::HashMap;
+use std::fs::File;
 
 use reqwest;
+use serde::Serialize;
+use serde_json::to_writer_pretty;
 
 #[tokio::main]
 async fn main() {
     let rasp_html = get_resp_html_from_lk().await;
-    parse_rasp_html(&rasp_html);
+    let rasp = parse_rasp_html(&rasp_html);
 
-    println!("Расписание полученно");
+    let file = File::create("rasp.json").unwrap();
+    to_writer_pretty(file, &rasp).unwrap();
 }
 
 async fn get_resp_html_from_lk() -> String {
@@ -31,10 +35,27 @@ async fn get_resp_html_from_lk() -> String {
     response_data
 }
 
-fn parse_rasp_html(reps_html: &str) {
+#[derive(Serialize)]
+struct StudentDay {
+    day_of_week: String,
+    date: String,
+    pairs: Vec<Pair>,
+}
+
+#[derive(Serialize)]
+struct Pair {
+    number: u8,
+    time_period: String,
+    name: String,
+    pair_type: String,
+    teacher: String,
+}
+
+fn parse_rasp_html(reps_html: &str) -> Vec<StudentDay> {
     let dom = tl::parse(reps_html, tl::ParserOptions::default()).unwrap();
     let parser = dom.parser();
     let rasp_days = dom.get_elements_by_class_name("day-container");
+    let mut result_rasp: Vec<StudentDay> = Vec::new();
     for day in rasp_days {
         let day_info = day.get(parser).unwrap().as_tag().unwrap();
         let date_info = day_info
@@ -52,7 +73,11 @@ fn parse_rasp_html(reps_html: &str) {
         let day_of_week = splited_date_info.next().unwrap();
         let date = splited_date_info.next().unwrap();
 
-        println!("День недели: {day_of_week}; Дата: {date}");
+        if day_of_week == "${dayOfWeek" {
+            continue;
+        }
+
+        let mut day_pairs: Vec<Pair> = Vec::new();
 
         let pairs_info = day_info.query_selector(parser, ".day-pair").unwrap();
         for pair in pairs_info {
@@ -72,9 +97,7 @@ fn parse_rasp_html(reps_html: &str) {
             let pair_number = splited_time_info[1];
             let time_period = splited_time_info.last().unwrap();
 
-            println!("\nПара: {pair_number}; Время: {time_period}");
-
-            let pair_description = pair_info
+            let pair_tag = pair_info
                 .query_selector(parser, ".pair_desc")
                 .unwrap()
                 .next()
@@ -82,19 +105,32 @@ fn parse_rasp_html(reps_html: &str) {
                 .get(parser)
                 .unwrap()
                 .as_tag()
-                .unwrap()
-                .inner_text(parser);
+                .unwrap();
+
+            let pair_description = pair_tag.inner_text(parser);
 
             let pair_desc_splited: Vec<&str> = pair_description.trim().split(",").collect();
             let pair_name = pair_desc_splited[0].trim();
             let pair_type = pair_desc_splited[1].trim();
             let pair_teacher = pair_desc_splited[2].trim();
 
-            println!(
-                "Предмет: {pair_name};\nТип занятия: {pair_type};\nПреподаватель: {pair_teacher}\n"
-            );
+            let pair = Pair {
+                number: pair_number.parse().unwrap(),
+                time_period: time_period.to_string(),
+                name: pair_name.to_string(),
+                pair_type: pair_type.to_string(),
+                teacher: pair_teacher.to_string(),
+            };
+            day_pairs.push(pair);
         }
 
-        println!("\n---------------------------------------------\n")
+        let student_day = StudentDay {
+            day_of_week: day_of_week.to_string(),
+            date: date.to_string(),
+            pairs: day_pairs,
+        };
+
+        result_rasp.push(student_day);
     }
+    return result_rasp;
 }
