@@ -1,9 +1,12 @@
 use std::collections::HashMap;
-use std::fs::File;
+use std::fs::{read_to_string, File};
 
+use chrono::prelude::*;
 use reqwest;
-use serde::Serialize;
-use serde_json::to_writer_pretty;
+use serde::{Deserialize, Serialize};
+use serde_json;
+use teloxide::prelude::*;
+use teloxide::types::ParseMode;
 
 #[tokio::main]
 async fn main() {
@@ -11,7 +14,60 @@ async fn main() {
     let rasp = parse_rasp_html(&rasp_html);
 
     let file = File::create("rasp.json").unwrap();
-    to_writer_pretty(file, &rasp).unwrap();
+    serde_json::to_writer_pretty(file, &rasp).unwrap();
+
+    let input_rasp = read_to_string("rasp.json").unwrap();
+
+    let all_day_rasp: Vec<StudentDay> = serde_json::from_str(&input_rasp).unwrap();
+    let today_rasp = find_today_rasp(all_day_rasp);
+    if let Some(today_rasp) = today_rasp {
+        // Обработка варианта Some
+        println!("Отправляем сообщение");
+        send_rasp_to_tg(today_rasp).await;
+    }
+}
+
+async fn send_rasp_to_tg(student_day: StudentDay) {
+    let bot = Bot::from_env();
+
+    // Specify the chat ID and the message text
+    let chat_id = "-4058835081"; // Replace with the actual chat ID
+    let mut message_text = format!(
+        "Внимание сегодня по расписанию есть пары!!!\nДата: {} ({})\n",
+        student_day.date, student_day.day_of_week
+    );
+    for pair in student_day.pairs {
+        let pair_time = format!("\nПара №{}; Время: {}\n", pair.number, pair.time_period);
+        let pair_name = format!("Предмет: {}\n", pair.name);
+        let pair_type = format!("Тип: {}\n", pair.pair_type);
+        let pair_teacher = format!("Преподаватель: {}\n", pair.teacher);
+        let pair_url = format!(
+            "<a href='{}'>Занаятие удаленно в Teams</a>\n",
+            pair.teams_url_pair
+        );
+
+        message_text =
+            message_text + &pair_time + &pair_name + &pair_type + &pair_teacher + &pair_url;
+    }
+    println!("{message_text}");
+    let _ = bot
+        .send_message(chat_id.to_string(), message_text)
+        .parse_mode(ParseMode::Html)
+        .send()
+        .await
+        .unwrap();
+}
+
+fn find_today_rasp(all_day_rasp: Vec<StudentDay>) -> Option<StudentDay> {
+    let local: DateTime<Local> = Local::now();
+    let today = local.format("%d.%m.%Y").to_string();
+
+    for student_day in all_day_rasp {
+        if student_day.date == today {
+            return Some(student_day);
+        }
+    }
+    None
 }
 
 async fn get_resp_html_from_lk() -> String {
@@ -35,14 +91,14 @@ async fn get_resp_html_from_lk() -> String {
     response_data
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct StudentDay {
     day_of_week: String,
     date: String,
     pairs: Vec<Pair>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct Pair {
     number: u8,
     time_period: String,
