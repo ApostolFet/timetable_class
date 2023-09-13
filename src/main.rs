@@ -49,6 +49,7 @@ struct Pair {
     name: String,
     pair_type: String,
     teacher: String,
+    teams_url_pair: String,
 }
 
 fn parse_rasp_html(reps_html: &str) -> Vec<StudentDay> {
@@ -107,6 +108,22 @@ fn parse_rasp_html(reps_html: &str) -> Vec<StudentDay> {
                 .as_tag()
                 .unwrap();
 
+            let teams_url_pair = pair_tag
+                .query_selector(parser, "a[href]")
+                .unwrap()
+                .next()
+                .unwrap()
+                .get(parser)
+                .unwrap()
+                .as_tag()
+                .unwrap()
+                .attributes()
+                .get("href")
+                .flatten()
+                .unwrap()
+                .try_as_utf8_str()
+                .unwrap();
+
             let pair_description = pair_tag.inner_text(parser);
 
             let pair_desc_splited: Vec<&str> = pair_description.trim().split(",").collect();
@@ -120,6 +137,7 @@ fn parse_rasp_html(reps_html: &str) -> Vec<StudentDay> {
                 name: pair_name.to_string(),
                 pair_type: pair_type.to_string(),
                 teacher: pair_teacher.to_string(),
+                teams_url_pair: teams_url_pair.to_string(),
             };
             day_pairs.push(pair);
         }
