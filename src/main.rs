@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fs::{read_to_string, File};
 
-use chrono::prelude::*;
+use chrono::{prelude::*, Duration};
 use dotenvy::dotenv;
 use reqwest;
 use serde::{Deserialize, Serialize};
@@ -35,7 +35,7 @@ async fn send_rasp_to_tg(student_day: StudentDay) {
     // Specify the chat ID and the message text
     let chat_id = "-4058835081"; // Replace with the actual chat ID
     let mut message_text = format!(
-        "Внимание сегодня по расписанию есть пары!!!\nДата: {} ({})\n",
+        "Внимание завтра по расписанию есть пары!!!\nДата: {} ({})\n",
         student_day.date, student_day.day_of_week
     );
     for pair in student_day.pairs {
@@ -62,10 +62,11 @@ async fn send_rasp_to_tg(student_day: StudentDay) {
 
 fn find_today_rasp(all_day_rasp: Vec<StudentDay>) -> Option<StudentDay> {
     let local: DateTime<Local> = Local::now();
-    let today = local.format("%d.%m.%Y").to_string();
+    let tomorrow = local + Duration::days(1);
+    let formated_day = tomorrow.format("%d.%m.%Y").to_string();
 
     for student_day in all_day_rasp {
-        if student_day.date == today {
+        if student_day.date == formated_day {
             return Some(student_day);
         }
     }
