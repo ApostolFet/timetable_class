@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fs::{read_to_string, File};
 
 use chrono::prelude::*;
+use dotenvy::dotenv;
 use reqwest;
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -10,6 +11,7 @@ use teloxide::types::ParseMode;
 
 #[tokio::main]
 async fn main() {
+    dotenv().ok();
     let rasp_html = get_resp_html_from_lk().await;
     let rasp = parse_rasp_html(&rasp_html);
 
