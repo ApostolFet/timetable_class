@@ -1,3 +1,4 @@
 /target
 rasp.json
 .env
+/logs
