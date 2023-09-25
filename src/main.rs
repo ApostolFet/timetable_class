@@ -167,21 +167,22 @@ fn parse_rasp_html(reps_html: &str) -> Vec<StudentDay> {
                 .as_tag()
                 .unwrap();
 
-            let teams_url_pair = pair_tag
-                .query_selector(parser, "a[href]")
-                .unwrap()
-                .next()
-                .unwrap()
-                .get(parser)
-                .unwrap()
-                .as_tag()
-                .unwrap()
-                .attributes()
-                .get("href")
-                .flatten()
-                .unwrap()
-                .try_as_utf8_str()
-                .unwrap();
+            let teams_url_pair_tag = pair_tag.query_selector(parser, "a[href]").unwrap().next();
+
+            let teams_url_pair = match teams_url_pair_tag {
+                Some(url_tag) => url_tag
+                    .get(parser)
+                    .unwrap()
+                    .as_tag()
+                    .unwrap()
+                    .attributes()
+                    .get("href")
+                    .flatten()
+                    .unwrap()
+                    .try_as_utf8_str()
+                    .unwrap(),
+                None => "Гиперссылка появится перед занятием",
+            };
 
             let pair_description = pair_tag.inner_text(parser);
 
